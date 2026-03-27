@@ -1,0 +1,1 @@
+# AWS stack outputs scaffold
