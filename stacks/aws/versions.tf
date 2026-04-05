@@ -8,5 +8,3 @@ terraform {
     }
   }
 }
-
-# Provider block intentionally omitted until AWS resources are added.

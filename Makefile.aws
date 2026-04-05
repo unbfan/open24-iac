@@ -6,6 +6,10 @@ BACKEND_CONFIG := $(LOCAL_TF_DIR)/backend.hcl
 TFVARS := $(LOCAL_TF_DIR)/terraform.tfvars
 TF := terraform -chdir=$(STACK_DIR)
 
+# AWS named profile — override with: make -f Makefile.aws <target> AWS_PROFILE=myprofile
+AWS_PROFILE ?= open24
+export AWS_PROFILE
+
 .PHONY: help check init fmt validate plan apply destroy output show
 
 help:
