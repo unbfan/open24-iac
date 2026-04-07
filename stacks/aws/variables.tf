@@ -1,3 +1,9 @@
+variable "environment" {
+  description = "Environment name (e.g. uat, prod, ephemeral-1). Used to prefix all resource names."
+  type        = string
+  default     = "uat"
+}
+
 variable "aws_region" {
   description = "AWS region"
   type        = string

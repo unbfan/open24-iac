@@ -35,12 +35,12 @@ resource "aws_vpc" "main" {
   enable_dns_support   = true
   enable_dns_hostnames = true
 
-  tags = { Name = "open24-vpc" }
+  tags = { Name = "open24-${var.environment}-vpc" }
 }
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
-  tags   = { Name = "open24-igw" }
+  tags   = { Name = "open24-${var.environment}-igw" }
 }
 
 resource "aws_subnet" "public_a" {
@@ -48,7 +48,7 @@ resource "aws_subnet" "public_a" {
   cidr_block              = "10.0.1.0/24"
   availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
-  tags                    = { Name = "open24-public-a" }
+  tags                    = { Name = "open24-${var.environment}-public-a" }
 }
 
 resource "aws_subnet" "public_b" {
@@ -56,7 +56,7 @@ resource "aws_subnet" "public_b" {
   cidr_block              = "10.0.2.0/24"
   availability_zone       = data.aws_availability_zones.available.names[1]
   map_public_ip_on_launch = true
-  tags                    = { Name = "open24-public-b" }
+  tags                    = { Name = "open24-${var.environment}-public-b" }
 }
 
 resource "aws_route_table" "public" {
@@ -67,7 +67,7 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.main.id
   }
 
-  tags = { Name = "open24-public-rt" }
+  tags = { Name = "open24-${var.environment}-public-rt" }
 }
 
 resource "aws_route_table_association" "public_a" {
@@ -85,7 +85,7 @@ resource "aws_route_table_association" "public_b" {
 # ──────────────────────────────────────────────
 
 resource "aws_security_group" "app" {
-  name        = "open24-app-sg"
+  name        = "open24-${var.environment}-app-sg"
   description = "Allow SSH, HTTP, HTTPS inbound; all outbound"
   vpc_id      = aws_vpc.main.id
 
@@ -120,11 +120,11 @@ resource "aws_security_group" "app" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "open24-app-sg" }
+  tags = { Name = "open24-${var.environment}-app-sg" }
 }
 
 resource "aws_security_group" "db" {
-  name        = "open24-db-sg"
+  name        = "open24-${var.environment}-db-sg"
   description = "Allow PostgreSQL from app SG only"
   vpc_id      = aws_vpc.main.id
 
@@ -143,7 +143,7 @@ resource "aws_security_group" "db" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "open24-db-sg" }
+  tags = { Name = "open24-${var.environment}-db-sg" }
 }
 
 # ──────────────────────────────────────────────
@@ -151,7 +151,7 @@ resource "aws_security_group" "db" {
 # ──────────────────────────────────────────────
 
 resource "aws_key_pair" "deploy" {
-  key_name   = "open24-deploy"
+  key_name   = "open24-${var.environment}-deploy"
   public_key = var.ssh_public_key
 }
 
@@ -324,7 +324,7 @@ duration=$((end_time - start_time))
 echo "=== user_data script completed in $duration seconds ==="
 EOF
 
-  tags = { Name = "open24-app" }
+  tags = { Name = "open24-${var.environment}-app" }
 
   lifecycle {
     ignore_changes = [public_ip, associate_public_ip_address]
@@ -337,11 +337,7 @@ EOF
 
 resource "aws_eip" "main" {
   domain = "vpc"
-  tags   = { Name = "open24-eip" }
-
-  lifecycle {
-    prevent_destroy = true
-  }
+  tags   = { Name = "open24-${var.environment}-eip" }
 }
 
 resource "aws_eip_association" "main" {
@@ -354,13 +350,13 @@ resource "aws_eip_association" "main" {
 # ──────────────────────────────────────────────
 
 resource "aws_db_subnet_group" "pg" {
-  name       = "open24-pg-subnet"
+  name       = "open24-${var.environment}-pg-subnet"
   subnet_ids = [aws_subnet.public_a.id, aws_subnet.public_b.id]
-  tags       = { Name = "open24-pg-subnet" }
+  tags       = { Name = "open24-${var.environment}-pg-subnet" }
 }
 
 resource "aws_db_instance" "pg" {
-  identifier     = "open24-pg"
+  identifier     = "open24-${var.environment}-pg"
   engine         = "postgres"
   engine_version = "16"
   instance_class = var.rds_instance_class
@@ -369,17 +365,21 @@ resource "aws_db_instance" "pg" {
   max_allocated_storage = 50
   storage_type          = "gp3"
 
-  db_name  = "open24"
+  db_name  = "open24_${var.environment}"
   username = "open24"
   password = var.db_password
 
   db_subnet_group_name   = aws_db_subnet_group.pg.name
   vpc_security_group_ids = [aws_security_group.db.id]
   publicly_accessible    = false
-  skip_final_snapshot    = true
+  skip_final_snapshot    = var.environment == "prod" ? false : true
 
-  backup_retention_period = 0
+  backup_retention_period = var.environment == "prod" ? 7 : 0
   multi_az                = false
 
-  tags = { Name = "open24-pg" }
+  tags = { Name = "open24-${var.environment}-pg" }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

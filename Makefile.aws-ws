@@ -1,0 +1,90 @@
+SHELL := /bin/sh
+
+STACK_DIR := stacks/aws
+LOCAL_TF_DIR := $(abspath ../open24-config-stay-local/tf/aws)
+BACKEND_CONFIG := $(LOCAL_TF_DIR)/backend.hcl
+TF := terraform -chdir=$(STACK_DIR)
+
+# AWS named profile — override with: make -f Makefile.aws-ws <target> AWS_PROFILE=myprofile
+AWS_PROFILE ?= open24
+export AWS_PROFILE
+
+# ── Workspace tfvars resolution ─────────────────────────────────
+# Uses $(WORKSPACE).tfvars if it exists, otherwise falls back to terraform.tfvars
+TFVARS = $(shell \
+  if [ -n "$(WORKSPACE)" ] && [ -f "$(LOCAL_TF_DIR)/$(WORKSPACE).tfvars" ]; then \
+    echo "$(LOCAL_TF_DIR)/$(WORKSPACE).tfvars"; \
+  else \
+    echo "$(LOCAL_TF_DIR)/terraform.tfvars"; \
+  fi)
+
+.PHONY: help check require-workspace init ws-list ws-new ws-select ws-delete fmt validate plan apply destroy output show
+
+help:
+	@echo "AWS Terraform Workspace targets"
+	@echo ""
+	@echo "  Workspace management:"
+	@echo "    make -f Makefile.aws-ws ws-list"
+	@echo "    make -f Makefile.aws-ws ws-new     WORKSPACE=<name>"
+	@echo "    make -f Makefile.aws-ws ws-select  WORKSPACE=<name>"
+	@echo "    make -f Makefile.aws-ws ws-delete  WORKSPACE=<name>"
+	@echo ""
+	@echo "  Plan/apply (auto-selects workspace):"
+	@echo "    make -f Makefile.aws-ws plan    WORKSPACE=<name>"
+	@echo "    make -f Makefile.aws-ws apply   WORKSPACE=<name>"
+	@echo "    make -f Makefile.aws-ws destroy WORKSPACE=<name>"
+	@echo "    make -f Makefile.aws-ws output  WORKSPACE=<name>"
+	@echo ""
+	@echo "  Tfvars resolution: uses <WORKSPACE>.tfvars if it exists, else terraform.tfvars"
+
+check:
+	@test -d "$(STACK_DIR)" || (echo "Missing stack dir: $(STACK_DIR)" && exit 1)
+	@test -f "$(BACKEND_CONFIG)" || (echo "Missing backend config: $(BACKEND_CONFIG)" && exit 1)
+
+require-workspace:
+	@test -n "$(WORKSPACE)" || (echo "Error: WORKSPACE is required. Usage: make -f Makefile.aws-ws <target> WORKSPACE=<name>" && exit 1)
+
+init: check
+	$(TF) init -backend-config=$(BACKEND_CONFIG)
+
+ws-list: check
+	$(TF) workspace list
+
+ws-new: check require-workspace
+	$(TF) workspace new $(WORKSPACE)
+
+ws-select: check require-workspace
+	$(TF) workspace select $(WORKSPACE)
+
+ws-delete: check require-workspace
+	$(TF) workspace select default
+	$(TF) workspace delete $(WORKSPACE)
+
+fmt:
+	terraform fmt -recursive stacks/aws
+
+validate: check
+	$(TF) validate
+
+plan: check require-workspace
+	$(TF) workspace select $(WORKSPACE)
+	@echo "Using tfvars: $(TFVARS)"
+	$(TF) plan -var-file=$(TFVARS)
+
+apply: check require-workspace
+	$(TF) workspace select $(WORKSPACE)
+	@echo "Using tfvars: $(TFVARS)"
+	$(TF) apply -var-file=$(TFVARS)
+
+destroy: check require-workspace
+	$(TF) workspace select $(WORKSPACE)
+	@echo "Using tfvars: $(TFVARS)"
+	$(TF) destroy -var-file=$(TFVARS)
+
+output: check require-workspace
+	$(TF) workspace select $(WORKSPACE)
+	$(TF) output
+
+show: check require-workspace
+	$(TF) workspace select $(WORKSPACE)
+	$(TF) show

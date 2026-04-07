@@ -1,3 +1,7 @@
+# ⚠️ DEPRECATED — Use Makefile.aws-ws with WORKSPACE= instead.
+# This file operates on the default Terraform workspace only.
+# Kept for backward compatibility; will be removed in a future cleanup.
+
 SHELL := /bin/sh
 
 STACK_DIR := stacks/aws
