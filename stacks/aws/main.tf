@@ -245,20 +245,6 @@ echo "Node $(node -v), npm $(npm -v)"
 # Install pnpm and pm2
 npm install -g pnpm pm2 --omit=dev 2>/dev/null || npm install -g pnpm pm2
 
-# Setup backend .env
-echo "Setting up backend config..."
-mkdir -p /home/open24/do-config/open24-backend
-printf '%s\n' \
-  'DATABASE_CLIENT=postgres' \
-  'DATABASE_HOST=${aws_db_instance.pg.address}' \
-  'DATABASE_PORT=${aws_db_instance.pg.port}' \
-  'DATABASE_NAME=${aws_db_instance.pg.db_name}' \
-  'DATABASE_USERNAME=${aws_db_instance.pg.username}' \
-  'DATABASE_PASSWORD=${var.db_password}' \
-  'DATABASE_SSL=true' \
-  > /home/open24/do-config/open24-backend/.env
-chown -R open24:open24 /home/open24/do-config/open24-backend
-
 # Setup Nginx
 echo "Configuring Nginx..."
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
@@ -327,7 +313,7 @@ EOF
   tags = { Name = "open24-${var.environment}-app" }
 
   lifecycle {
-    ignore_changes = [public_ip, associate_public_ip_address]
+    ignore_changes = [associate_public_ip_address]
   }
 }
 

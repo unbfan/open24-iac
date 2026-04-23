@@ -43,9 +43,15 @@ Terraform backend config and tfvars live outside this repo in:
     backend.hcl
     terraform.tfvars
   aws/
-    backend.hcl
-    terraform.tfvars    # Default/fallback tfvars
-    uat.tfvars          # UAT-specific overrides (current AWS infra)
+    dev/
+      backend.hcl
+      terraform.tfvars
+    uat/
+      backend.hcl
+      terraform.tfvars
+    prod/
+      backend.hcl
+      terraform.tfvars
 ```
 
 This keeps sensitive values local and out of infra code.
@@ -82,7 +88,7 @@ make aws-ws-select WORKSPACE=uat        # Switch to workspace
 make aws-ws-delete WORKSPACE=old-env    # Delete a workspace
 ```
 
-Plan/apply (auto-selects workspace, uses `<WORKSPACE>.tfvars` if it exists):
+Plan/apply (auto-selects workspace, uses `tf/aws/<WORKSPACE>/terraform.tfvars`):
 ```sh
 make aws-ws-plan    WORKSPACE=uat       # Plan against UAT
 make aws-ws-apply   WORKSPACE=uat       # Apply UAT changes
@@ -90,17 +96,23 @@ make aws-ws-destroy WORKSPACE=uat       # Destroy UAT infra
 make aws-ws-output  WORKSPACE=uat       # Show outputs
 ```
 
-Tfvars resolution: if `../open24-config-stay-local/tf/aws/uat.tfvars` exists, it's used automatically. Otherwise falls back to `terraform.tfvars`.
+Initialize backend with the same workspace/env folder:
+```sh
+make aws-ws-init WORKSPACE=uat
+```
 
 ### Spinning up an ephemeral environment
 ```sh
 # 1. Create a new workspace
 make aws-ws-new WORKSPACE=test-feature-x
 
-# 2. Create tfvars (copy uat.tfvars, change domains/passwords)
-cp ../open24-config-stay-local/tf/aws/uat.tfvars \
-   ../open24-config-stay-local/tf/aws/test-feature-x.tfvars
-# Edit test-feature-x.tfvars: change environment, domains, db_password
+# 2. Create env folder + config (copy uat, then change domains/passwords)
+mkdir -p ../open24-config-stay-local/tf/aws/test-feature-x
+cp ../open24-config-stay-local/tf/aws/uat/backend.hcl \
+   ../open24-config-stay-local/tf/aws/test-feature-x/backend.hcl
+cp ../open24-config-stay-local/tf/aws/uat/terraform.tfvars \
+   ../open24-config-stay-local/tf/aws/test-feature-x/terraform.tfvars
+# Edit test-feature-x/terraform.tfvars: change environment, domains, db_password
 
 # 3. Plan and apply
 make aws-ws-plan  WORKSPACE=test-feature-x
@@ -137,5 +149,5 @@ Manual deploy via `workflow_dispatch` is also available with an environment sele
 - Run `init` before `plan/apply` for each stack.
 - `Makefile.do` and `Makefile.aws-ws` both validate required local config files before running Terraform.
 - AWS resource names are parameterized with `var.environment` (e.g., `open24-uat-vpc`, `open24-uat-pg`).
-- Each workspace **must** have a matching `<WORKSPACE>.tfvars` with `environment` set — there is no default. Without it, Terraform will error or fall back to `terraform.tfvars` which may target the wrong environment.
+- Each workspace **must** have `../open24-config-stay-local/tf/aws/<WORKSPACE>/terraform.tfvars` with `environment` set.
 - `Makefile.aws` (non-workspace) is deprecated; use `aws-ws-*` targets instead.
